@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magazzino PRO</title>
+<style>
+body{font-family:-apple-system;background:#f2f2f7;padding:10px}
+.product{padding:8px;border-radius:10px;margin-bottom:6px}
+.qty{font-size:20px;font-weight:bold}
+button{margin:2px;padding:4px 8px}
+.add{background:#34c759;color:#fff}
+.sub{background:#ff3b30;color:#fff}
+</style>
+</head>
+<body>
+
+<h1>📦 Magazzino PRO</h1>
+
+<input id="name" placeholder="Nome prodotto">
+<input id="qty" type="number" placeholder="Quantità iniziale">
+<br><br>
+<label>Colore:</label>
+<input id="color" type="color" value="#ffffff">
+<br><br>
+
+<button onclick="addProduct()">Salva prodotto</button>
+<button onclick="resetAll()">🧹 Azzera tutto</button>
+
+<div id="list"></div>
+
+<script>
+let db;
+const r=indexedDB.open("magazzinoDB",1);
+r.onupgradeneeded=e=>{
+ db=e.target.result;
+ db.createObjectStore("products",{keyPath:"id",autoIncrement:true});
+};
+r.onsuccess=e=>{db=e.target.result;render();};
+
+function s(m="readonly"){return db.transaction("products",m).objectStore("products")}
+
+function render(){
+ list.innerHTML="";
+ s().getAll().onsuccess=e=>{
+  e.target.result.forEach(p=>{
+   list.innerHTML+=`
+    <div class="product" style="background:${p.color}">
+     <b>${p.name}</b><br>
+     <span class="qty">${p.qty}</span><br>
+     <button class="sub" onclick="u(${p.id},-1)">-1</button>
+     <button class="add" onclick="u(${p.id},1)">+1</button>
+     <button onclick="del(${p.id})">Elimina</button>
+    </div>`;
+  });
+ }
+}
+
+function addProduct(){
+ const name=document.getElementById("name").value.trim().toUpperCase();
+ if(!name)return alert("Inserisci nome");
+ const qty=parseInt(qty.value)||0;
+ const color=color.value;
+ s("readwrite").add({name,qty,color}).onsuccess=()=>{
+  document.getElementById("name").value="";
+  document.getElementById("qty").value="";
+  render();
+ }
+}
+
+function u(id,v){
+ const st=s("readwrite");
+ st.get(id).onsuccess=e=>{
+  e.target.result.qty+=v;
+  st.put(e.target.result).onsuccess=render;
+ }
+}
+
+function del(id){
+ if(confirm("Eliminare?")) s("readwrite").delete(id).onsuccess=render;
+}
+function resetAll(){
+ if(confirm("Cancellare tutto?")) s("readwrite").clear().onsuccess=render;
+}
+</script>
+
+</body>
+</html>

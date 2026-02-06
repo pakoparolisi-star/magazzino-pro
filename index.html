@@ -2,39 +2,54 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Magazzino</title>
 
 <style>
 body{
-  font-family:-apple-system,BlinkMacSystemFont;
+  font-family:-apple-system;
   background:#f2f2f7;
   margin:0;
-  padding:10px;
+  padding:8px;
 }
-h1{text-align:center}
+h1{text-align:center;margin:8px 0}
+
 .card{
   background:#fff;
-  border-radius:10px;
-  padding:10px;
-  margin-bottom:10px;
+  border-radius:8px;
+  padding:6px 8px;
+  margin-bottom:6px;
 }
-input,button{
-  padding:8px;
-  font-size:16px;
-}
-button{margin:2px}
+
 .prod{
-  border-left:10px solid #000;
+  border-left:6px solid #000;
 }
+
 .qty{
-  font-size:20px;
-  font-weight:bold;
+  font-size:18px;
+  font-weight:700;
 }
+
+input,button{
+  font-size:14px;
+  padding:6px;
+}
+
 .controls button{
-  min-width:48px;
+  min-width:38px;
+  border:none;
+  border-radius:6px;
+  color:#fff;
+}
+
+.plus{background:#2ecc71}
+.minus{background:#e74c3c}
+.move{background:#999;color:#fff}
+
+.small{
+  font-size:12px;
+  padding:4px 6px;
 }
 </style>
 </head>
@@ -43,67 +58,78 @@ button{margin:2px}
 <h1>📦 Magazzino</h1>
 
 <div class="card">
-  <input id="cat" placeholder="Categoria"><br><br>
-  <input id="name" placeholder="Nome prodotto"><br><br>
-  Colore:
-  <input type="color" id="color" value="#4CAF50"><br><br>
-  <button onclick="addProduct()">Salva prodotto</button>
+  <input id="cat" placeholder="Categoria"><br>
+  <input id="name" placeholder="Prodotto"><br>
+  <input type="color" id="color" value="#000000">
+  <button onclick="add()">Salva</button>
 </div>
 
 <div id="list"></div>
 
 <script>
-let db;
+let db, scrollY=0;
 
-const openDB = indexedDB.open("magazzinoDB",1);
+const req=indexedDB.open("magazzinoDB",2);
 
-openDB.onupgradeneeded=e=>{
+req.onupgradeneeded=e=>{
   db=e.target.result;
-  db.createObjectStore("prodotti",{keyPath:"id",autoIncrement:true});
+  const st=db.createObjectStore("prodotti",{keyPath:"id",autoIncrement:true});
+  st.createIndex("ordine","ordine");
 };
 
-openDB.onsuccess=e=>{
+req.onsuccess=e=>{
   db=e.target.result;
-  load();
+  render();
 };
 
-function addProduct(){
-  const name=document.getElementById("name").value.toUpperCase();
-  if(!name)return;
+function upper(v){return v.toUpperCase();}
+
+function add(){
+  const n=upper(name.value.trim());
+  if(!n)return;
   const tx=db.transaction("prodotti","readwrite");
-  tx.objectStore("prodotti").add({
-    categoria:document.getElementById("cat").value,
-    nome:name,
-    colore:document.getElementById("color").value,
-    qty:0
-  });
-  tx.oncomplete=()=>{load();document.getElementById("name").value=""};
+  const st=tx.objectStore("prodotti");
+  st.count().onsuccess=e=>{
+    st.add({
+      categoria:upper(cat.value),
+      nome:n,
+      colore:color.value,
+      qty:0,
+      ordine:e.target.result
+    });
+  };
+  tx.oncomplete=()=>{name.value="";render();}
 }
 
-function load(){
-  document.getElementById("list").innerHTML="";
+function render(){
+  scrollY=window.scrollY;
+  list.innerHTML="";
   const tx=db.transaction("prodotti","readonly");
-  tx.objectStore("prodotti").openCursor().onsuccess=e=>{
+  const st=tx.objectStore("prodotti").index("ordine");
+  st.openCursor().onsuccess=e=>{
     const c=e.target.result;
     if(c){
       const p=c.value;
       const d=document.createElement("div");
       d.className="card prod";
-      d.style.borderColor=p.colore;
+      d.style.borderLeftColor=p.colore;
       d.innerHTML=`
-        <b>${p.categoria || ""}</b><br>
-        ${p.nome}<br>
-        <div class="qty">${p.qty}</div>
-        <div class="controls">
-          ${[-10,-5,-4,-3,-2,-1,1,2,3,4,5,10].map(n=>
-            `<button onclick="upd(${c.key},${n})">${n>0?"+":""}${n}</button>`
-          ).join("")}
-        </div>
-        <button onclick="reset(${c.key})">Reset</button>
-        <button onclick="del(${c.key})">Elimina</button>
-      `;
-      document.getElementById("list").appendChild(d);
+<b>${p.categoria}</b><br>
+${p.nome}
+<div class="qty">${p.qty}</div>
+<div class="controls">
+  ${[-10,-5,-4,-3,-2,-1].map(n=>`<button class="minus" onclick="upd(${p.id},${n})">${n}</button>`).join("")}
+  ${[1,2,3,4,5,10].map(n=>`<button class="plus" onclick="upd(${p.id},${n})">+${n}</button>`).join("")}
+</div>
+<button class="move small" onclick="move(${p.id},-1)">▲</button>
+<button class="move small" onclick="move(${p.id},1)">▼</button>
+<button class="small" onclick="reset(${p.id})">Reset</button>
+<button class="small" onclick="del(${p.id})">Elimina</button>
+`;
+      list.appendChild(d);
       c.continue();
+    } else {
+      window.scrollTo(0,scrollY);
     }
   }
 }
@@ -116,11 +142,11 @@ function upd(id,n){
     p.qty+=n;
     st.put(p);
   };
-  tx.oncomplete=load;
+  tx.oncomplete=render;
 }
 
 function reset(id){
-  if(!confirm("Azzerare quantità?"))return;
+  if(!confirm("Azzerare?"))return;
   const tx=db.transaction("prodotti","readwrite");
   const st=tx.objectStore("prodotti");
   st.get(id).onsuccess=e=>{
@@ -128,14 +154,32 @@ function reset(id){
     p.qty=0;
     st.put(p);
   };
-  tx.oncomplete=load;
+  tx.oncomplete=render;
 }
 
 function del(id){
-  if(!confirm("Eliminare prodotto?"))return;
+  if(!confirm("Eliminare?"))return;
   const tx=db.transaction("prodotti","readwrite");
   tx.objectStore("prodotti").delete(id);
-  tx.oncomplete=load;
+  tx.oncomplete=render;
+}
+
+function move(id,dir){
+  const tx=db.transaction("prodotti","readwrite");
+  const st=tx.objectStore("prodotti");
+  st.get(id).onsuccess=e=>{
+    const p=e.target.result;
+    const idx=st.index("ordine");
+    idx.openCursor().onsuccess=x=>{
+      const c=x.target.result;
+      if(c && c.value.ordine===p.ordine+dir){
+        const o=c.value;
+        [p.ordine,o.ordine]=[o.ordine,p.ordine];
+        st.put(o); st.put(p);
+      }
+    };
+  };
+  tx.oncomplete=render;
 }
 </script>
 </body>

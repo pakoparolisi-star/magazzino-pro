@@ -45,7 +45,7 @@ input,button{
 
 .plus{background:#2ecc71}
 .minus{background:#e74c3c}
-.move{background:#999;color:#fff}
+.move{background:#999}
 
 .small{
   font-size:12px;
@@ -58,8 +58,8 @@ input,button{
 <h1>📦 Magazzino</h1>
 
 <div class="card">
-  <input id="cat" placeholder="Categoria"><br>
-  <input id="name" placeholder="Prodotto"><br>
+  <input id="cat" placeholder="Categoria">
+  <input id="name" placeholder="Prodotto">
   <input type="color" id="color" value="#000000">
   <button onclick="add()">Salva</button>
 </div>
@@ -69,7 +69,7 @@ input,button{
 <script>
 let db, scrollY=0;
 
-const req=indexedDB.open("magazzinoDB",2);
+const req=indexedDB.open("magazzinoDB",3);
 
 req.onupgradeneeded=e=>{
   db=e.target.result;
@@ -82,31 +82,45 @@ req.onsuccess=e=>{
   render();
 };
 
-function upper(v){return v.toUpperCase();}
+function up(v){return v.toUpperCase();}
 
 function add(){
-  const n=upper(name.value.trim());
-  if(!n)return;
+  const nome=up(name.value.trim());
+  if(!nome)return;
+
   const tx=db.transaction("prodotti","readwrite");
   const st=tx.objectStore("prodotti");
-  st.count().onsuccess=e=>{
-    st.add({
-      categoria:upper(cat.value),
-      nome:n,
-      colore:color.value,
-      qty:0,
-      ordine:e.target.result
-    });
+
+  let maxOrd=0;
+  st.openCursor().onsuccess=e=>{
+    const c=e.target.result;
+    if(c){
+      maxOrd=Math.max(maxOrd,c.value.ordine);
+      c.continue();
+    }else{
+      st.add({
+        categoria:up(cat.value),
+        nome,
+        colore:color.value,
+        qty:0,
+        ordine:maxOrd+1
+      });
+    }
   };
-  tx.oncomplete=()=>{name.value="";render();}
+
+  tx.oncomplete=()=>{
+    name.value="";
+    render();
+  };
 }
 
 function render(){
   scrollY=window.scrollY;
   list.innerHTML="";
   const tx=db.transaction("prodotti","readonly");
-  const st=tx.objectStore("prodotti").index("ordine");
-  st.openCursor().onsuccess=e=>{
+  const idx=tx.objectStore("prodotti").index("ordine");
+
+  idx.openCursor().onsuccess=e=>{
     const c=e.target.result;
     if(c){
       const p=c.value;
@@ -118,8 +132,8 @@ function render(){
 ${p.nome}
 <div class="qty">${p.qty}</div>
 <div class="controls">
-  ${[-10,-5,-4,-3,-2,-1].map(n=>`<button class="minus" onclick="upd(${p.id},${n})">${n}</button>`).join("")}
-  ${[1,2,3,4,5,10].map(n=>`<button class="plus" onclick="upd(${p.id},${n})">+${n}</button>`).join("")}
+${[-10,-5,-4,-3,-2,-1].map(n=>`<button class="minus" onclick="upd(${p.id},${n})">${n}</button>`).join("")}
+${[1,2,3,4,5,10].map(n=>`<button class="plus" onclick="upd(${p.id},${n})">+${n}</button>`).join("")}
 </div>
 <button class="move small" onclick="move(${p.id},-1)">▲</button>
 <button class="move small" onclick="move(${p.id},1)">▼</button>
@@ -128,10 +142,10 @@ ${p.nome}
 `;
       list.appendChild(d);
       c.continue();
-    } else {
+    }else{
       window.scrollTo(0,scrollY);
     }
-  }
+  };
 }
 
 function upd(id,n){

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Magazzino</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont;
+  background: #f2f2f7;
+  margin: 0;
+  padding: 10px;
+}
+h1 { text-align: center; }
+
+#addBox {
+  background: white;
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+input {
+  width: 100%;
+  padding: 8px;
+  margin: 5px 0;
+  font-size: 16px;
+}
+
+button {
+  padding: 6px 8px;
+  margin: 2px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: none;
+}
+
+.product {
+  border-radius: 10px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.qty {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.controls button {
+  background: #e5e5ea;
+}
+
+.danger { background: #ff3b30; color: white; }
+.reset { background: #ffcc00; }
+</style>
+</head>
+
+<body>
+
+<h1>📦 Magazzino</h1>
+
+<div id="addBox">
+  <input id="cat" placeholder="Categoria">
+  <input id="name" placeholder="Nome prodotto (maiuscolo)">
+  <input id="color" type="color" value="#ffffff">
+  <button onclick="addProduct()">Salva prodotto</button>
+</div>
+
+<div id="list"></div>
+
+<script>
+let products = JSON.parse(localStorage.getItem("MAGAZZINO_PAKO_V1")) || [];
+
+function save() {
+  localStorage.setItem("MAGAZZINO_PAKO_V1", JSON.stringify(products));
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  products.forEach((p, i) => {
+    const d = document.createElement("div");
+    d.className = "product";
+    d.style.background = p.color;
+
+    d.innerHTML = `
+      <div class="row">
+        <div>
+          <strong>${p.cat}</strong><br>
+          ${p.name}
+        </div>
+        <div class="qty">${p.qty}</div>
+      </div>
+
+      <div class="controls">
+        ${[-10,-5,-4,-3,-2,-1,1,2,3,4,5,10].map(n =>
+          `<button onclick="changeQty(${i},${n})">${n>0?'+':''}${n}</button>`
+        ).join('')}
+        <br>
+        <button class="reset" onclick="resetQty(${i})">Reset</button>
+        <button class="danger" onclick="removeProd(${i})">Elimina</button>
+      </div>
+    `;
+
+    list.appendChild(d);
+  });
+}
+
+function addProduct() {
+  const cat = document.getElementById("cat").value.trim();
+  const name = document.getElementById("name").value.trim().toUpperCase();
+  const color = document.getElementById("color").value;
+
+  if (!cat || !name) {
+    alert("Compila tutti i campi");
+    return;
+  }
+
+  products.push({ cat, name, qty: 0, color });
+  document.getElementById("cat").value = "";
+  document.getElementById("name").value = "";
+
+  save();
+  render();
+}
+
+function changeQty(i, n) {
+  products[i].qty += n;
+  save();
+  render();
+}
+
+function resetQty(i) {
+  if (confirm("Azzerare la quantità?")) {
+    products[i].qty = 0;
+    save();
+    render();
+  }
+}
+
+function removeProd(i) {
+  if (confirm("Eliminare il prodotto?")) {
+    products.splice(i, 1);
+    save();
+    render();
+  }
+}
+
+render();
+</script>
+
+</body>
+</html>
